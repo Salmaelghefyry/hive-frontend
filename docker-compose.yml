@@ -1,0 +1,123 @@
+version: '3.8'
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: hive-postgres
+    environment:
+      POSTGRES_DB: hive_db
+      POSTGRES_USER: hive_user
+      POSTGRES_PASSWORD: hive_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - hive-network
+
+  # Redis for caching and sessions
+  redis:
+    image: redis:7-alpine
+    container_name: hive-redis
+    ports:
+      - "6379:6379"
+    networks:
+      - hive-network
+
+  # Eureka Service Discovery
+  eureka-server:
+    build: ./eureka-server
+    container_name: hive-eureka
+    ports:
+      - "8761:8761"
+    networks:
+      - hive-network
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+
+  # API Gateway
+  api-gateway:
+    build: ./api-gateway
+    container_name: hive-gateway
+    ports:
+      - "9999:9999"
+    depends_on:
+      - eureka-server
+    networks:
+      - hive-network
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE=http://eureka-server:8761/eureka
+
+  # User Service
+  user-service:
+    build: ./user-service
+    container_name: hive-user-service
+    depends_on:
+      - postgres
+      - eureka-server
+      - redis
+    networks:
+      - hive-network
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/hive_db
+      - SPRING_DATASOURCE_USERNAME=hive_user
+      - SPRING_DATASOURCE_PASSWORD=hive_password
+      - SPRING_REDIS_HOST=redis
+      - EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE=http://eureka-server:8761/eureka
+
+  # Project Service
+  project-service:
+    build: ./project-service
+    container_name: hive-project-service
+    depends_on:
+      - postgres
+      - eureka-server
+    networks:
+      - hive-network
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/hive_db
+      - SPRING_DATASOURCE_USERNAME=hive_user
+      - SPRING_DATASOURCE_PASSWORD=hive_password
+      - EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE=http://eureka-server:8761/eureka
+
+  # Task Service
+  task-service:
+    build: ./task-service
+    container_name: hive-task-service
+    depends_on:
+      - postgres
+      - eureka-server
+    networks:
+      - hive-network
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/hive_db
+      - SPRING_DATASOURCE_USERNAME=hive_user
+      - SPRING_DATASOURCE_PASSWORD=hive_password
+      - EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE=http://eureka-server:8761/eureka
+
+  # Comment Service
+  comment-service:
+    build: ./comment-service
+    container_name: hive-comment-service
+    depends_on:
+      - postgres
+      - eureka-server
+    networks:
+      - hive-network
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/hive_db
+      - SPRING_DATASOURCE_USERNAME=hive_user
+      - SPRING_DATASOURCE_PASSWORD=hive_password
+      - EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE=http://eureka-server:8761/eureka
+
+volumes:
+  postgres_data:
+
+networks:
+  hive-network:
+    driver: bridge
